@@ -1,0 +1,12 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# SQLite
+*.sqlite
+scrapers/*.sqlite
+
+# Archivos debug
+debug_*.html
+*.log

@@ -1,0 +1,97 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Histórico de precios</h2>
+
+<style>
+  .filters { display:grid; grid-template-columns: repeat(6, 1fr); gap:10px; margin-bottom:12px }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; margin:8px 0 16px }
+  .chip { padding:6px 10px; border:1px solid #374151; border-radius:999px; font-size:12px; opacity:.9 }
+  .chip.active { border-color:#22c55e; background:#122b1b }
+  .danger { background:#ef4444; color:#fff }
+  .tiny { font-size:12px; opacity:.8 }
+</style>
+
+<!-- Navegación por clases -->
+<div class="chips">
+  <a class="chip {{ 'active' if not current_filters.vehicle_class else '' }}"
+     href="{{ url_for('prices_page', sort=current_filters.sort, dir=current_filters.dir) }}">Todas</a>
+  {% for c in clases %}
+    <a class="chip {{ 'active' if current_filters.vehicle_class==c else '' }}"
+       href="{{ url_for('prices_page', class=c, sort=current_filters.sort, dir=current_filters.dir) }}">{{ c }}</a>
+  {% endfor %}
+</div>
+
+<!-- Filtros -->
+<form method="get" action="/prices" class="filters">
+  <select name="plaza_id">
+    <option value="">— Caseta (todas) —</option>
+    {% for p in plazas %}
+      <option value="{{p.id}}" {% if current_filters.plaza_id==p.id %}selected{% endif %}>{{p.name}}</option>
+    {% endfor %}
+  </select>
+
+  <select name="class">
+    <option value="">— Clase (todas) —</option>
+    {% for c in clases %}
+      <option value="{{c}}" {% if current_filters.vehicle_class==c %}selected{% endif %}>{{c}}</option>
+    {% endfor %}
+  </select>
+
+  <input type="date" name="from" value="{{ current_filters['from'] or '' }}" placeholder="Desde (YYYY-MM-DD)"/>
+  <input type="date" name="to" value="{{ current_filters['to'] or '' }}" placeholder="Hasta (YYYY-MM-DD)"/>
+
+  <select name="sort">
+    <option value="date"  {% if current_filters.sort=='date'  %}selected{% endif %}>Orden: Fecha</option>
+    <option value="plaza" {% if current_filters.sort=='plaza' %}selected{% endif %}>Orden: Caseta</option>
+    <option value="class" {% if current_filters.sort=='class' %}selected{% endif %}>Orden: Clase</option>
+    <option value="price" {% if current_filters.sort=='price' %}selected{% endif %}>Orden: Precio</option>
+  </select>
+
+  <select name="dir">
+    <option value="desc" {% if current_filters.dir=='desc' %}selected{% endif %}>Desc</option>
+    <option value="asc"  {% if current_filters.dir=='asc'  %}selected{% endif %}>Asc</option>
+  </select>
+
+  <div>
+    <button class="btn" type="submit">Aplicar filtros</button>
+  </div>
+</form>
+
+<!-- Borrar registros filtrados (vía POST a un helper) -->
+<form method="post" action="/admin/delete_prices"
+      onsubmit="return confirm('¿Seguro que quieres eliminar los registros filtrados? Esta acción no se puede deshacer.');">
+  <input type="hidden" name="plaza_id" value="{{ current_filters.plaza_id or '' }}">
+  <input type="hidden" name="vehicle_class" value="{{ current_filters.vehicle_class or '' }}">
+  <input type="hidden" name="from" value="{{ current_filters['from'] or '' }}">
+  <input type="hidden" name="to" value="{{ current_filters['to'] or '' }}">
+  <button class="btn danger" type="submit">Eliminar registros filtrados</button>
+  <span class="tiny">Se borran solo los que coinciden con los filtros actuales.</span>
+</form>
+
+<br>
+
+<table>
+  <thead>
+    <tr>
+      <th>Fecha</th>
+      <th>Caseta</th>
+      <th>Clase</th>
+      <th>Precio</th>
+      <th>Carretera</th>
+      <th>Estado</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for p, plaza, route in prices %}
+      <tr>
+        <td>{{ p.collected_at }}</td>
+        <td>{{ plaza.name }}</td>
+        <td>{{ p.vehicle_class }}</td>
+        <td>${{ '%.2f'|format(p.price) }} {{ p.currency }}</td>
+        <td>{{ plaza.road or '—' }}</td>
+        <td>{{ plaza.state or '—' }}</td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
