@@ -487,17 +487,28 @@ def ensure_db_norm(db_path: str):
 
 
 def _parse_decimal(txt: str):
-    if txt is None: return None
-    s = str(txt).strip().replace("$","").replace(" ", "")
-    if s.count(",")==1 and s.count(".")==0:
+    if txt is None:
+        return None
+    s = str(txt).strip()
+    s = s.replace("$", "").replace(" ", "")
+
+    # Quitar separador de miles (coma en casos como 1,340.0)
+    if "," in s and "." in s:
+        s = s.replace(",", "")
+
+    # Caso: formato europeo con coma decimal (ej. 228,50)
+    elif s.count(",") == 1 and s.count(".") == 0:
         s = s.replace(",", ".")
+
+    # Caso raro: más de un punto => quita todos menos el último
     if s.count(".") > 1:
-        s = s.replace(".", "")
+        parts = s.split(".")
+        s = "".join(parts[:-1]) + "." + parts[-1]
+
     try:
         return float(s)
-    except:
+    except ValueError:
         return None
-
 
 def _upsert_via(con, via, long_km):
     cur = con.cursor()
