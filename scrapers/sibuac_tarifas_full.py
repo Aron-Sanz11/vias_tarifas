@@ -24,8 +24,36 @@ from urllib.parse import urljoin
 import requests
 from bs4 import BeautifulSoup
 
+from datetime import datetime, date
+
 BASE = "https://app.sct.gob.mx/sibuac_internet"
 URL_FORM = f"{BASE}/ControllerUI?action=CmdSelTarifaRep1Data"
+
+def norm_fecha(txt: str, default_today=True) -> str:
+    if not txt or not str(txt).strip():
+        return date.today().isoformat() if default_today else None
+    s = str(txt).strip()
+
+    # 1) DD/MM/YYYY
+    m = re.match(r'^(\d{1,2})/(\d{1,2})/(\d{4})$', s)
+    if m:
+        d, mth, y = map(int, m.groups())
+        return date(y, mth, d).isoformat()
+
+    # 2) YYYY-MM-DD (ya ISO)
+    m = re.match(r'^(\d{4})-(\d{2})-(\d{2})$', s)
+    if m:
+        return s
+
+    # 3) Intenta parseo flexible (10/01/2025, 10-01-2025, etc.)
+    for fmt in ("%d-%m-%Y", "%d.%m.%Y", "%d %m %Y"):
+        try:
+            return datetime.strptime(s, fmt).date().isoformat()
+        except ValueError:
+            pass
+
+    # 4) Último recurso: intenta dateutil si lo usas; si no, devuelve hoy o None
+    return date.today().isoformat() if default_today else None
 
 
 # ------------------- util debug -------------------
@@ -400,61 +428,61 @@ PRAGMA foreign_keys=ON;
 PRAGMA journal_mode=WAL;
 
 CREATE TABLE IF NOT EXISTS via (
-  id        INTEGER PRIMARY KEY AUTOINCREMENT,
-  via       TEXT NOT NULL,
-  long_km   INTEGER,
-  UNIQUE(via, long_km)
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    via       TEXT NOT NULL,
+    long_km   INTEGER,
+    UNIQUE(via, long_km)
 );
 CREATE UNIQUE INDEX IF NOT EXISTS uq_via_nullkm ON via(via) WHERE long_km IS NULL;
 
 CREATE TABLE IF NOT EXISTS vehiculo_clase (
-  id      INTEGER PRIMARY KEY AUTOINCREMENT,
-  nombre  TEXT NOT NULL,
-  UNIQUE(nombre)
+    id      INTEGER PRIMARY KEY AUTOINCREMENT,
+    nombre  TEXT NOT NULL,
+    UNIQUE(nombre)
 );
 
 CREATE TABLE IF NOT EXISTS tarifa_definicion (
-  id        INTEGER PRIMARY KEY AUTOINCREMENT,
-  via_id    INTEGER NOT NULL REFERENCES via(id),
-  clase_id  INTEGER NOT NULL REFERENCES vehiculo_clase(id),
-  ejes      INTEGER,
-  CONSTRAINT uq_def UNIQUE (via_id, clase_id, ejes)
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    via_id    INTEGER NOT NULL REFERENCES via(id),
+    clase_id  INTEGER NOT NULL REFERENCES vehiculo_clase(id),
+    ejes      INTEGER,
+    CONSTRAINT uq_def UNIQUE (via_id, clase_id, ejes)
 );
 CREATE UNIQUE INDEX IF NOT EXISTS uq_def_null ON tarifa_definicion(via_id, clase_id) WHERE ejes IS NULL;
 
 CREATE TABLE IF NOT EXISTS tarifa_historial (
-  id             INTEGER PRIMARY KEY AUTOINCREMENT,
-  definicion_id  INTEGER NOT NULL REFERENCES tarifa_definicion(id),
-  tarifa         REAL    NOT NULL,
-  vigente_desde  TEXT,
-  vigente_hasta  TEXT,
-  fuente         TEXT DEFAULT 'SIBUAC'
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    definicion_id  INTEGER NOT NULL REFERENCES tarifa_definicion(id),
+    tarifa         REAL    NOT NULL,
+    vigente_desde  TEXT,
+    vigente_hasta  TEXT,
+    fuente         TEXT DEFAULT 'SIBUAC'
 );
 CREATE INDEX IF NOT EXISTS ix_hist_def ON tarifa_historial(definicion_id);
 CREATE INDEX IF NOT EXISTS ix_hist_vig ON tarifa_historial(vigente_desde, vigente_hasta);
 
 CREATE TABLE IF NOT EXISTS consulta (
-  id           INTEGER PRIMARY KEY AUTOINCREMENT,
-  executed_at  TEXT NOT NULL,
-  params_json  TEXT,
-  status       TEXT
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    executed_at  TEXT NOT NULL,
+    params_json  TEXT,
+    status       TEXT
 );
 CREATE TABLE IF NOT EXISTS consulta_item (
-  id            INTEGER PRIMARY KEY AUTOINCREMENT,
-  consulta_id   INTEGER NOT NULL REFERENCES consulta(id),
-  historial_id  INTEGER NOT NULL REFERENCES tarifa_historial(id)
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    consulta_id   INTEGER NOT NULL REFERENCES consulta(id),
+    historial_id  INTEGER NOT NULL REFERENCES tarifa_historial(id)
 );
 CREATE INDEX IF NOT EXISTS ix_citem_consulta ON consulta_item(consulta_id);
 
 CREATE TABLE IF NOT EXISTS tarifa_snapshot_raw (
-  id             INTEGER PRIMARY KEY AUTOINCREMENT,
-  via            TEXT,
-  long_km        TEXT,
-  vigente_desde  TEXT,
-  clase          TEXT,
-  ejes           TEXT,
-  tarifa         TEXT,
-  captured_at    TEXT DEFAULT (datetime('now'))
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    via            TEXT,
+    long_km        TEXT,
+    vigente_desde  TEXT,
+    clase          TEXT,
+    ejes           TEXT,
+    tarifa         TEXT,
+    captured_at    TEXT DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS tarifa_snapshot (
@@ -622,7 +650,9 @@ def persist_items_normalizados(con, items, fecha_corte, save_raw=True):
             clase_id = _upsert_clase(con, clase)
             def_id   = _upsert_def(con, via_id, clase_id, ejes_int)
 
-            desde = (it.get("vigente_desde") or fecha_corte)
+            # desde = (it.get("vigente_desde") or fecha_corte)
+            desde = norm_fecha(it.get("vigente_desde")) or fecha_corte
+
 
             # Snapshot (siempre, por definición)
             _insert_snapshot_def(con, def_id, cid, fecha_corte, desde, tarifa_val, "SIBUAC")
@@ -633,7 +663,8 @@ def persist_items_normalizados(con, items, fecha_corte, save_raw=True):
                 hid = _insert_hist(con, def_id, tarifa_val, desde); _append_citem(con, cid, hid); nuevos += 1
             else:
                 if float(h[1]) != float(tarifa_val):
-                    _close_hist(con, h[0], desde)
+                    # _close_hist(con, h[0], desde)
+                    _close_hist(con, h[0], norm_fecha(desde))
                     hid = _insert_hist(con, def_id, tarifa_val, desde); _append_citem(con, cid, hid); nuevos += 1
 
         _end_consulta(con, cid, "OK")
