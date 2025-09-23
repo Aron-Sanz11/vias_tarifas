@@ -144,6 +144,7 @@ def introspect():
 
 @app.route("/")
 def index():
+    c = request.args.get("c")
     q = request.args.get("q")
     fecha = request.args.get("fecha")
     table = request.args.get("table") or DEFAULT_TABLE
@@ -167,6 +168,8 @@ def index():
 
     # filtros (sólo los que están presentes)
     filters, params = [], []
+    if c and "categoria" in cols_for(cur, table):
+        filters.append("categoria LIKE ?"); params.append(f"%{c}%")
     if q and "via" in cols_for(cur, table):
         filters.append("via LIKE ?"); params.append(f"%{q}%")
     if fecha and "fecha" in cols_for(cur, table):
@@ -197,6 +200,7 @@ def index():
 
 @app.route("/export")
 def export_csv():
+    c = request.args.get("c")
     q = request.args.get("q")
     fecha = request.args.get("fecha")
     table = request.args.get("table") or DEFAULT_TABLE
@@ -207,6 +211,8 @@ def export_csv():
     headers = choose_headers(cur, table)
 
     filters, params = [], []
+    if c and "categoria" in cols_for(cur, table):
+        filters.append("categoria LIKE ?"); params.append(f"%{c}%")
     if q and "via" in cols_for(cur, table):
         filters.append("via LIKE ?"); params.append(f"%{q}%")
     if fecha and "fecha" in cols_for(cur, table):
@@ -232,7 +238,7 @@ API_KEY = os.environ.get("API_KEY", "admin")
 CORS(app, resources={r"/api/*":{"origins": "*"}})
 api = Blueprint("api", __name__, url_prefix="/api/v1")
 
-@api.route("/vigente")
+@api.route("/vigente")   
 def api_vigente():
     return query_view("vw_tarifa_vigente")
 
@@ -269,7 +275,7 @@ def parse_pagination():
     except:
         return 100, max(offset, 0)
     
-def query_view(table, allowed_filters=("q","fecha","from","to")):
+def query_view(table, allowed_filters=("c","q","fecha","from","to")):
     if not require_api_key():
         return jsonify({"error":"unauthorized"}), 401
 
@@ -277,6 +283,7 @@ def query_view(table, allowed_filters=("q","fecha","from","to")):
     cols = cols_for(cur, table:=table) if 'cols_for' in globals() else [c for c in choose_headers(cur, table)]
     headers = choose_headers(cur, table)
 
+    c = request.args.get("c")           # LIKE sobre categoria
     q = request.args.get("q")           # LIKE sobre caseta
     fecha = request.args.get("fecha")   # igualdad
     ffrom = request.args.get("from")    # rango desde (YYYY-MM-DD)
@@ -284,6 +291,8 @@ def query_view(table, allowed_filters=("q","fecha","from","to")):
     lim, off = parse_pagination()
 
     filters, params = [], []
+    if c and "categoria" in cols:
+        filters.append("categoria LIKE ?"); params.append(f"%{c}%")
     if q and "caseta" in cols:
         filters.append("caseta LIKE ?"); params.append(f"%{q}%")
     if fecha and "fecha" in cols:
