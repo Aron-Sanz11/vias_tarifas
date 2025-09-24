@@ -1,0 +1,212 @@
+SIBUAC API – Guía de consultas y combinaciones
+===============================================
+Base URL (local): http://127.0.0.1:5001/api/v1
+Autenticación:
+  - Header:  X-API-Key: admin
+  - Query :  ?api_key=admin
+
+Endpoints
+---------
+1) /vigente     -> Precios vigentes (vista: vw_tarifa_vigente)
+2) /hist        -> Historial de tarifas (vista: vw_tarifa_hist)
+3) /snapshot    -> Snapshots por fecha (vista: vw_tarifa_snapshot)
+4) /cambios     -> Cambios recientes vs anterior (vista: vw_cambios_recientes)
+
+Parámetros soportados (según columnas de la vista)
+--------------------------------------------------
+- api_key: string (requerido si no usas header)
+- limit  : número o especial (all | 0 | inf | infinity | todo)
+- offset : número (0 por defecto)
+- c 	 : texto (búsqueda LIKE por 'categoria', usa Motos, Autos, Autobuses, Camiones)
+- q      : texto (búsqueda LIKE por 'caseta', si la columna existe)
+- fecha  : YYYY-MM-DD (igualdad exacta, si existe la columna 'fecha')
+- from   : YYYY-MM-DD (rango desde, si existe la columna 'fecha')
+- to     : YYYY-MM-DD (rango hasta, si existe la columna 'fecha')
+
+Notas sobre 'limit'
+-------------------
+- limit=100 (por defecto si no especificas)
+- ilimitado: limit=all  | limit=0 | limit=inf | limit=infinity | limit=todo
+
+Respuestas JSON (estructura general)
+-----------------------------------
+{
+  "table": "<vista/tabla>",
+  "total": <total de registros en la vista>,
+  "count": <registros devueltos en esta página>,
+  "limit": <None si ilimitado, o número>,
+  "offset": <offset actual>,
+  "items": [ { ... filas ... } ]
+}
+
+EJEMPLOS POR ENDPOINT (URLs directas)
+=====================================
+
+/vigente (precios vigentes)
+---------------------------
+1) Básico (con api_key en query)
+   /vigente?api_key=admin
+
+2) Todo (sin paginar)
+   /vigente?api_key=admin&limit=all
+   (equivalentes: limit=0 | limit=inf | limit=infinity | limit=todo)
+
+3) Paginado (página 1 de 500 filas)
+   /vigente?api_key=admin&limit=500&offset=0
+
+4) Paginado (página 2 de 500 filas)
+   /vigente?api_key=admin&limit=500&offset=500
+
+5) Búsqueda por caseta (LIKE)
+   /vigente?api_key=admin&q=Quer%C3%A9taro
+
+6) Combinado (búsqueda + sin límite)
+   /vigente?api_key=admin&q=Le%C3%B3n&limit=all
+
+
+/hist (histórico)
+-----------------
+1) Los primeros 100 (por defecto)
+   /hist?api_key=admin
+
+2) Los últimos 1000 con fecha descendente
+   /hist?api_key=admin&limit=1000
+
+3) Todo el historial
+   /hist?api_key=admin&limit=all
+
+4) Filtrar por fecha exacta
+   /hist?api_key=admin&fecha=2025-09-15
+
+5) Filtrar por rango de fechas
+   /hist?api_key=admin&from=2025-09-01&to=2025-09-23
+
+6) Filtrar por caseta (LIKE) y rango
+   /hist?api_key=admin&q=Celaya&from=2025-08-01&to=2025-09-23&limit=all
+
+7) Paginación por lotes (ejemplo 5000 por página)
+   /hist?api_key=admin&limit=5000&offset=0
+   /hist?api_key=admin&limit=5000&offset=5000
+   /hist?api_key=admin&limit=5000&offset=10000
+   (repite hasta cubrir total)
+
+
+/snapshot (snapshots por fecha)
+-------------------------------
+1) Todos los snapshots
+   /snapshot?api_key=admin&limit=all
+
+2) Solo de un día (fecha exacta)
+   /snapshot?api_key=admin&fecha=2025-09-15
+
+3) Rango de fechas (todo septiembre)
+   /snapshot?api_key=admin&from=2025-09-01&to=2025-09-30&limit=all
+
+4) Con filtro por caseta + rango
+   /snapshot?api_key=admin&q=Irapuato&from=2025-09-01&to=2025-09-30
+
+
+/ cambios (dif vs anterior)
+---------------------------
+* Requiere que la vista vw_cambios_recientes exista y tenga columnas compatibles.
+1) Últimos 200 cambios
+   /cambios?api_key=admin&limit=200
+
+2) Todo
+   /cambios?api_key=admin&limit=all
+
+3) Rango de fechas (si tiene columna 'fecha')
+   /cambios?api_key=admin&from=2025-09-01&to=2025-09-23
+
+4) Filtro por caseta (si existe 'caseta')
+   /cambios?api_key=admin&q=Salamanca
+
+
+EJEMPLOS CON COMANDOS (PowerShell / Windows)
+============================================
+
+PowerShell – Invoke-RestMethod (recomendado):
+---------------------------------------------
+# Header (recomendado)
+Invoke-RestMethod -Uri "http://127.0.0.1:5001/api/v1/vigente" -Headers @{ "X-API-Key" = "admin" }
+
+# Query (alternativa)
+Invoke-RestMethod -Uri "http://127.0.0.1:5001/api/v1/hist?api_key=admin&limit=all"
+
+# Rango de fechas + todo
+Invoke-RestMethod -Uri "http://127.0.0.1:5001/api/v1/snapshot?api_key=admin&from=2025-09-01&to=2025-09-30&limit=all"
+
+PowerShell – curl.exe clásico (no el alias):
+--------------------------------------------
+& curl.exe -H "X-API-Key: admin" "http://127.0.0.1:5001/api/v1/vigente"
+& curl.exe -H "X-API-Key: admin" "http://127.0.0.1:5001/api/v1/hist?limit=all"
+
+
+EJEMPLOS EN PHP
+===============
+
+cURL nativo:
+------------
+<?php
+function api_get($path, $params = []) {
+    $base = "http://127.0.0.1:5001/api/v1";
+    $headers = ["X-API-Key: admin"]; // auth por header
+
+    if (!empty($params)) {
+        $qs = http_build_query($params);
+        $path .= (strpos($path,'?')===false ? '?' : '&') . $qs;
+    }
+
+    $ch = curl_init("$base$path");
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER => $headers,
+        CURLOPT_CONNECTTIMEOUT => 4,
+        CURLOPT_TIMEOUT => 20
+    ]);
+    $raw  = curl_exec($ch);
+    $err  = curl_error($ch);
+    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($err)  throw new Exception("cURL error: $err");
+    if ($code >= 400) throw new Exception("HTTP $code: $raw");
+
+    $data = json_decode($raw, true);
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        throw new Exception("JSON error: " . json_last_error_msg());
+    }
+    return $data;
+}
+
+// Ejemplos:
+$vigenteAll = api_get("/vigente", ["limit" => "all"]);
+$histRange  = api_get("/hist", ["from"=>"2025-09-01","to"=>"2025-09-23","limit"=>"all"]);
+$snapCaseta = api_get("/snapshot", ["q"=>"Celaya","limit"=>"1000"]);
+
+Guzzle (composer require guzzlehttp/guzzle):
+--------------------------------------------
+<?php
+require 'vendor/autoload.php';
+use GuzzleHttp\Client;
+
+$client = new Client([
+  'base_uri' => 'http://127.0.0.1:5001/api/v1/',
+  'timeout'  => 20.0,
+  'headers'  => ['X-API-Key' => 'admin']
+]);
+
+$res  = $client->get('vigente', ['query' => ['limit' => 'all']]);
+$data = json_decode($res->getBody(), true);
+
+$res2 = $client->get('hist', ['query' => ['from'=>'2025-09-01','to'=>'2025-09-23','limit'=>'all']]);
+$hist = json_decode($res2->getBody(), true);
+
+
+BUENAS PRÁCTICAS
+================
+- En producción usa HTTPS y un API key seguro (ENV), no "admin".
+- Para descargas masivas, prefiere paginar (p. ej., 5000 por lote) para evitar timeouts.
+- Revisa 'total' y 'count' en la respuesta para saber si ya cubriste todos los registros.
+- Si consumes desde navegador (frontend), restringe CORS a tu dominio en lugar de "*".
+- Controla filtros que dependan de columnas (q/fecha/from/to aplican solo si la vista tiene esas columnas).
