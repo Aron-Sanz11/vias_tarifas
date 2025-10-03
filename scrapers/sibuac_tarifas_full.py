@@ -317,15 +317,15 @@ def parse_long_km(raw):
     if not s:
         return None
     s = (s.replace("kms","").replace("km","")
-           .replace("kilómetros","").replace("kilometros","")
-           .replace(" ", "").replace(",", "."))
+            .replace("kilómetros","").replace("kilometros","")
+            .replace(" ", "").replace(",", "."))
     parts = s.split(".")
     if len(parts) > 2:
         s = "".join(parts[:-1]) + "." + parts[-1]
     try:
-      return int(round(float(s), 0))
+        return int(round(float(s), 0))
     except:
-      return None
+        return None
 
 
 def parse_table_with_multilevel_headers(html: str):
@@ -573,7 +573,7 @@ def _upsert_def(con, via_id, clase_id, ejes_int):
     row = cur.execute("""
         SELECT id FROM tarifa_definicion
         WHERE via_id=? AND clase_id=?
-          AND ((ejes IS NULL AND ? IS NULL) OR ejes=?)
+            AND ((ejes IS NULL AND ? IS NULL) OR ejes=?)
         LIMIT 1
     """, (via_id, clase_id, ejes_int, ejes_int)).fetchone()
     if row: return row[0]
@@ -585,8 +585,8 @@ def _upsert_def(con, via_id, clase_id, ejes_int):
 def _hist_vigente(con, def_id):
     cur = con.cursor()
     cur.execute("""SELECT id, tarifa FROM tarifa_historial 
-                   WHERE definicion_id=? AND vigente_hasta IS NULL
-                   ORDER BY id DESC LIMIT 1""", (def_id,))
+                    WHERE definicion_id=? AND vigente_hasta IS NULL
+                    ORDER BY id DESC LIMIT 1""", (def_id,))
     return cur.fetchone()
 
 
@@ -597,15 +597,15 @@ def _close_hist(con, hist_id, hasta_iso):
 def _insert_hist(con, def_id, tarifa, desde_iso, fuente="SIBUAC"):
     cur = con.cursor()
     cur.execute("""INSERT INTO tarifa_historial(definicion_id, tarifa, vigente_desde, fuente)
-                   VALUES(?,?,?,?)""", (def_id, float(tarifa), desde_iso, fuente)); con.commit()
+                    VALUES(?,?,?,?)""", (def_id, float(tarifa), desde_iso, fuente)); con.commit()
     return cur.lastrowid
 
 
 def _begin_consulta(con, params: dict):
     cur = con.cursor()
     cur.execute("""INSERT INTO consulta(executed_at, params_json, status)
-                   VALUES(?,?,?)""", (dt.datetime.now().isoformat(timespec="seconds"),
-                                      json.dumps(params, ensure_ascii=False), "RUNNING")); con.commit()
+                    VALUES(?,?,?)""", (dt.datetime.now().isoformat(timespec="seconds"),
+                                    json.dumps(params, ensure_ascii=False), "RUNNING")); con.commit()
     return cur.lastrowid
 
 
@@ -623,9 +623,9 @@ def _insert_snapshot_def(con, def_id, consulta_id, fecha_corte, vigente_desde, t
         VALUES (?, ?, ?, ?, ?, ?)
         ON CONFLICT(definicion_id, fecha_corte, fuente)
         DO UPDATE SET
-          vigente_desde = excluded.vigente_desde,
-          tarifa       = excluded.tarifa,
-          consulta_id  = COALESCE(excluded.consulta_id, consulta_id)
+            vigente_desde = excluded.vigente_desde,
+            tarifa       = excluded.tarifa,
+            consulta_id  = COALESCE(excluded.consulta_id, consulta_id)
     """, (def_id, consulta_id, fecha_corte, vigente_desde, float(tarifa), fuente))
     con.commit()
 
@@ -637,13 +637,13 @@ def persist_items_normalizados(con, items, fecha_corte, save_raw=True):
         for it in items:
             if save_raw:
                 con.execute("""INSERT INTO tarifa_snapshot_raw(via,long_km,vigente_desde,clase,ejes,tarifa)
-                               VALUES(?,?,?,?,?,?)""",
+                                VALUES(?,?,?,?,?,?)""",
                             (it.get("via"),
-                             str(it.get("long_km") if it.get("long_km") is not None else ""),
-                             it.get("vigente_desde"),
-                             it.get("clase"),
-                             str(it.get("ejes") if it.get("ejes") is not None else ""),
-                             it.get("tarifa")))
+                            str(it.get("long_km") if it.get("long_km") is not None else ""),
+                            it.get("vigente_desde"),
+                            it.get("clase"),
+                            str(it.get("ejes") if it.get("ejes") is not None else ""),
+                            it.get("tarifa")))
 
             via = (it.get("via") or "").strip()
             clase = (it.get("clase") or "").strip()
