@@ -81,7 +81,8 @@ El scraper **normaliza** y crea/actualiza registros de forma **idempotente** (an
 Si ya cuentas con datos de staging en `tarifa_snapshot_raw`, puedes procesarlos con:
 
 ```powershell
-python .\scrapers\sibuac_tarifas_full.py --db .\scrapers\sibuac_tarifas.sqlite --min-vias 120 --from-raw
+python .\scrapers\sibuac_tarifas_full.py --db .\scrapers\sibuac_tarifas.sqlite --min-vias 120
+#  --from-raw
 ```
 
 - `--min-vias 120` filtra por casetas con `long_km >= 120` (ajústalo o quítalo).
