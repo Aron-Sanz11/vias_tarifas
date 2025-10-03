@@ -1,4 +1,4 @@
-from flask import Flask, request, render_template_string, send_file, Blueprint, jsonify
+from flask import Flask, request, render_template_string, send_file, Blueprint, jsonify,json
 import os, sqlite3, csv, io
 from flask_cors import CORS
 
@@ -26,6 +26,23 @@ ALLOWED_TABLES = {
 PREFERRED_ORDER = ["fecha", "caseta", "Caseta", "categoria", "Clase", "Ejes", "tarifa", "vigente_desde", "long_km", "fuente"]
 
 app = Flask(__name__)
+# app.config['JSON_AS_ASCII'] = False
+
+try:
+    from flask.json.provider import DefaultJSONProvider
+except ImportError:
+    DefaultJSONProvider = None
+
+if DefaultJSONProvider is not None:
+    class NoAsciiJSONProvider(DefaultJSONProvider):   
+        def dumps(self, obj, **kwargs):
+            # fuerza UTF-8 real en vez de \u00xx
+            kwargs.setdefault("ensure_ascii", False)
+            return super().dumps(obj, **kwargs)
+    app.json = NoAsciiJSONProvider(app)
+else:
+    # Fallback para Flask antiguo
+    app.config["JSON_AS_ASCII"] = False
 
 BASE_TMPL = """
 <!doctype html>

@@ -619,9 +619,15 @@ def _append_citem(con, cid, hid):
 
 def _insert_snapshot_def(con, def_id, consulta_id, fecha_corte, vigente_desde, tarifa, fuente="SIBUAC"):
     con.execute("""
-        INSERT INTO tarifa_snapshot(definicion_id, consulta_id, fecha_corte, vigente_desde, tarifa, fuente)
-        VALUES (?,?,?,?,?,?)
-    """, (def_id, consulta_id, fecha_corte, vigente_desde, float(tarifa), fuente)); con.commit()
+        INSERT INTO tarifa_snapshot (definicion_id, consulta_id, fecha_corte, vigente_desde, tarifa, fuente)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(definicion_id, fecha_corte, fuente)
+        DO UPDATE SET
+          vigente_desde = excluded.vigente_desde,
+          tarifa       = excluded.tarifa,
+          consulta_id  = COALESCE(excluded.consulta_id, consulta_id)
+    """, (def_id, consulta_id, fecha_corte, vigente_desde, float(tarifa), fuente))
+    con.commit()
 
 
 def persist_items_normalizados(con, items, fecha_corte, save_raw=True):
